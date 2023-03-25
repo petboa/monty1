@@ -1,3 +1,8 @@
+/*
+ * File: run_monty.c
+ * Auth: Peter Boakye
+ */
+
 #include "monty.h"
 #include <string.h>
 
