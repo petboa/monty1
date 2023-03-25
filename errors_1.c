@@ -1,4 +1,10 @@
-include "monty.h"
+/*
+ * File: errors_1.c
+ * Auth: Bennett Dixon
+ *       Brennan D Baraban
+ */
+
+#include "monty.h"
 
 int usage_error(void);
 int malloc_error(void);
