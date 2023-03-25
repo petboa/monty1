@@ -1,7 +1,6 @@
 /*
  * File: errors_1.c
- * Auth: Bennett Dixon
- *       Brennan D Baraban
+ * Auth: Peter Boakye
  */
 
 #include "monty.h"
