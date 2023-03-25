@@ -1,78 +1,169 @@
-#ifndef MONTY_H
-#define MONTY_H
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include "monty.h"
 #include <string.h>
-#include <ctype.h>
+
+void free_tokens(void);
+unsigned int token_arr_len(void);
+int is_empty_line(char *line, char *delims);
+void (*get_op_func(char *opcode))(stack_t**, unsigned int);
+int run_monty(FILE *script_fd);
+
 /**
- * struct stack_s - doubly linked list representation of a stack (or queue)
- * @n: integer
- * @prev: points to the previous element of the stack (or queue)
- * @next: points to the next element of the stack (or queue)
+ * free_tokens - Frees the global op_toks array of strings.
+ */
+void free_tokens(void)
+{
+	size_t i = 0;
+
+	if (op_toks == NULL)
+		return;
+
+	for (i = 0; op_toks[i]; i++)
+		free(op_toks[i]);
+
+	free(op_toks);
+}
+
+/**
+ * token_arr_len - Gets the length of current op_toks.
  *
- * Description: doubly linked list node structure
- * for stack, queues, LIFO, FIFO Holberton project
+ * Return: Length of current op_toks (as int).
  */
-typedef struct stack_s
+unsigned int token_arr_len(void)
 {
-	int n;
-	struct stack_s *prev;
-	struct stack_s *next;
-} stack_t;
+	unsigned int toks_len = 0;
+
+	while (op_toks[toks_len])
+		toks_len++;
+	return (toks_len);
+}
+
 /**
- * struct bus_s - variables -args, file, line content
- * @arg: value
- * @file: pointer to monty file
- * @content: line content
- * @lifi: flag change stack <-> queue
- * Description: carries values through the program
- */
-typedef struct bus_s
-{
-	char *arg;
-	FILE *file;
-	char *content;
-	int lifi;
-}  bus_t;
-extern bus_t bus;
-/**
- * struct instruction_s - opcode and its function
- * @opcode: the opcode
- * @f: function to handle the opcode
+ * is_empty_line - Checks if a line read from getline only contains delimiters.
+ * @line: A pointer to the line.
+ * @delims: A string of delimiter characters.
  *
- * Description: opcode and its function
- * for stack, queues, LIFO, FIFO Holberton project
+ * Return: If the line only contains delimiters - 1.
+ *         Otherwise - 0.
  */
-typedef struct instruction_s
+int is_empty_line(char *line, char *delims)
 {
-	char *opcode;
-	void (*f)(stack_t **stack, unsigned int line_number);
-} instruction_t;
-char *_realloc(char *ptr, unsigned int old_size, unsigned int new_size);
-ssize_t getstdin(char **lineptr, int file);
-char  *clean_line(char *content);
-void f_push(stack_t **head, unsigned int number);
-void f_pall(stack_t **head, unsigned int number);
-void f_pint(stack_t **head, unsigned int number);
-int execute(char *content, stack_t **head, unsigned int counter, FILE *file);
-void free_stack(stack_t *head);
-void f_pop(stack_t **head, unsigned int counter);
-void f_swap(stack_t **head, unsigned int counter);
-void f_add(stack_t **head, unsigned int counter);
-void f_nop(stack_t **head, unsigned int counter);
-void f_sub(stack_t **head, unsigned int counter);
-void f_div(stack_t **head, unsigned int counter);
-void f_mul(stack_t **head, unsigned int counter);
-void f_mod(stack_t **head, unsigned int counter);
-void f_pchar(stack_t **head, unsigned int counter);
-void f_pstr(stack_t **head, unsigned int counter);
-void f_rotl(stack_t **head, unsigned int counter);
-void f_rotr(stack_t **head, __attribute__((unused)) unsigned int counter);
-void addnode(stack_t **head, int n);
-void addqueue(stack_t **head, int n);
-void f_queue(stack_t **head, unsigned int counter);
-void f_stack(stack_t **head, unsigned int counter);
-#endif
+	int i, j;
+
+	for (i = 0; line[i]; i++)
+	{
+		for (j = 0; delims[j]; j++)
+		{
+			if (line[i] == delims[j])
+				break;
+		}
+		if (delims[j] == '\0')
+			return (0);
+	}
+
+	return (1);
+}
+
+/**
+ * get_op_func - Matches an opcode with its corresponding function.
+ * @opcode: The opcode to match.
+ *
+ * Return: A pointer to the corresponding function.
+ */
+void (*get_op_func(char *opcode))(stack_t**, unsigned int)
+{
+	instruction_t op_funcs[] = {
+		{"push", monty_push},
+		{"pall", monty_pall},
+		{"pint", monty_pint},
+		{"pop", monty_pop},
+		{"swap", monty_swap},
+		{"add", monty_add},
+		{"nop", monty_nop},
+		{"sub", monty_sub},
+		{"div", monty_div},
+		{"mul", monty_mul},
+		{"mod", monty_mod},
+		{"pchar", monty_pchar},
+		{"pstr", monty_pstr},
+		{"rotl", monty_rotl},
+		{"rotr", monty_rotr},
+		{"stack", monty_stack},
+		{"queue", monty_queue},
+		{NULL, NULL}
+	};
+	int i;
+
+	for (i = 0; op_funcs[i].opcode; i++)
+	{
+		if (strcmp(opcode, op_funcs[i].opcode) == 0)
+			return (op_funcs[i].f);
+	}
+
+	return (NULL);
+}
+
+/**
+ * run_monty - Primary function to execute a Monty bytecodes script.
+ * @script_fd: File descriptor for an open Monty bytecodes script.
+ *
+ * Return: EXIT_SUCCESS on success, respective error code on failure.
+ */
+int run_monty(FILE *script_fd)
+{
+	stack_t *stack = NULL;
+	char *line = NULL;
+	size_t len = 0, exit_status = EXIT_SUCCESS;
+	unsigned int line_number = 0, prev_tok_len = 0;
+	void (*op_func)(stack_t**, unsigned int);
+
+	if (init_stack(&stack) == EXIT_FAILURE)
+		return (EXIT_FAILURE);
+
+	while (getline(&line, &len, script_fd) != -1)
+	{
+		line_number++;
+		op_toks = strtow(line, DELIMS);
+		if (op_toks == NULL)
+		{
+			if (is_empty_line(line, DELIMS))
+				continue;
+			free_stack(&stack);
+			return (malloc_error());
+		}
+		else if (op_toks[0][0] == '#') /* comment line */
+		{
+			free_tokens();
+			continue;
+		}
+		op_func = get_op_func(op_toks[0]);
+		if (op_func == NULL)
+		{
+			free_stack(&stack);
+			exit_status = unknown_op_error(op_toks[0], line_number);
+			free_tokens();
+			break;
+		}
+		prev_tok_len = token_arr_len();
+		op_func(&stack, line_number);
+		if (token_arr_len() != prev_tok_len)
+		{
+			if (op_toks && op_toks[prev_tok_len])
+				exit_status = atoi(op_toks[prev_tok_len]);
+			else
+				exit_status = EXIT_FAILURE;
+			free_tokens();
+			break;
+		}
+		free_tokens();
+	}
+	free_stack(&stack);
+
+	if (line && *line == 0)
+	{
+		free(line);
+		return (malloc_error());
+	}
+
+	free(line);
+	return (exit_status);
+}
